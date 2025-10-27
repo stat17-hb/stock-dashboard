@@ -3,6 +3,8 @@ import yfinance as yf
 import pandas as pd
 from datetime import datetime
 import plotly.graph_objects as go
+import time
+import random
 
 
 class USPortfolio:
@@ -40,54 +42,112 @@ class USPortfolio:
         # 환율
         self.exchange_rate = exchange_rate
 
-    def get_current_price(self, ticker):
-        """주식 심볼을 입력받아 현재 가격을 반환하는 함수"""
-        try:
-            stock = yf.Ticker(ticker)
-            hist = stock.history(period="1d")
+    @st.cache_data(ttl=300)  # 5분 캐시
+    def get_current_price(_self, ticker):
+        """주식 심볼을 입력받아 현재 가격을 반환하는 함수 (재시도 로직 포함)"""
+        max_retries = 3
+        base_delay = 2
 
-            if not hist.empty:
-                current_price = hist['Close'].iloc[-1]
-                return round(current_price, 2)
-            else:
-                return None
+        for attempt in range(max_retries):
+            try:
+                # API 호출 간 랜덤 딜레이 추가 (rate limit 방지)
+                if attempt > 0:
+                    delay = base_delay * (2 ** attempt) + random.uniform(0, 1)
+                    time.sleep(delay)
 
-        except Exception as e:
-            st.error(f"오류: {ticker} 조회 중 문제가 발생했습니다: {e}")
-            return None
+                stock = yf.Ticker(ticker)
+                hist = stock.history(period="1d")
 
-    def get_stock_info(self, ticker):
-        """주식의 상세 정보를 조회하는 함수"""
-        try:
-            stock_obj = yf.Ticker(ticker)
-            info = stock_obj.info
+                if not hist.empty:
+                    current_price = hist['Close'].iloc[-1]
+                    return round(current_price, 2)
+                else:
+                    return None
 
-            stock_info = {
-                'symbol': ticker,
-                'name': info.get('longName', self.stock_names.get(ticker, 'N/A')),
-                'current_price': info.get('currentPrice', self.get_current_price(ticker)),
-                'previous_close': info.get('previousClose', 'N/A'),
-                'day_change': info.get('regularMarketChange', 'N/A'),
-                'day_change_percent': info.get('regularMarketChangePercent', 'N/A'),
-                'market_cap': info.get('marketCap', 'N/A'),
-                'pe_ratio': info.get('trailingPE', 'N/A'),
-                'dividend_yield': info.get('dividendYield', 'N/A'),
-                '52_week_high': info.get('fiftyTwoWeekHigh', 'N/A'),
-                '52_week_low': info.get('fiftyTwoWeekLow', 'N/A')
-            }
+            except Exception as e:
+                error_msg = str(e)
 
-            return stock_info
+                # Rate limit 에러인 경우
+                if "Too Many Requests" in error_msg or "Rate limited" in error_msg:
+                    if attempt < max_retries - 1:
+                        wait_time = base_delay * (2 ** attempt) + random.uniform(1, 3)
+                        st.warning(f"⏳ {ticker} API 제한 감지, {wait_time:.1f}초 후 재시도 ({attempt + 1}/{max_retries})")
+                        time.sleep(wait_time)
+                        continue
+                    else:
+                        st.error(f"❌ {ticker} 조회 실패: API 요청 제한 초과. 잠시 후 다시 시도해주세요.")
+                        return None
+                else:
+                    st.error(f"오류: {ticker} 조회 중 문제가 발생했습니다: {e}")
+                    return None
 
-        except Exception as e:
-            st.error(f"오류: {ticker} 정보 조회 중 문제가 발생했습니다: {e}")
-            return None
+        return None
+
+    @st.cache_data(ttl=300)  # 5분 캐시
+    def get_stock_info(_self, ticker):
+        """주식의 상세 정보를 조회하는 함수 (재시도 로직 포함)"""
+        max_retries = 3
+        base_delay = 2
+
+        for attempt in range(max_retries):
+            try:
+                # API 호출 간 랜덤 딜레이 추가
+                if attempt > 0:
+                    delay = base_delay * (2 ** attempt) + random.uniform(0, 1)
+                    time.sleep(delay)
+
+                stock_obj = yf.Ticker(ticker)
+
+                # 작은 딜레이 추가 (연속 호출 방지)
+                time.sleep(0.5)
+
+                info = stock_obj.info
+
+                stock_info = {
+                    'symbol': ticker,
+                    'name': info.get('longName', _self.stock_names.get(ticker, 'N/A')),
+                    'current_price': info.get('currentPrice', _self.get_current_price(ticker)),
+                    'previous_close': info.get('previousClose', 'N/A'),
+                    'day_change': info.get('regularMarketChange', 'N/A'),
+                    'day_change_percent': info.get('regularMarketChangePercent', 'N/A'),
+                    'market_cap': info.get('marketCap', 'N/A'),
+                    'pe_ratio': info.get('trailingPE', 'N/A'),
+                    'dividend_yield': info.get('dividendYield', 'N/A'),
+                    '52_week_high': info.get('fiftyTwoWeekHigh', 'N/A'),
+                    '52_week_low': info.get('fiftyTwoWeekLow', 'N/A')
+                }
+
+                return stock_info
+
+            except Exception as e:
+                error_msg = str(e)
+
+                # Rate limit 에러인 경우
+                if "Too Many Requests" in error_msg or "Rate limited" in error_msg:
+                    if attempt < max_retries - 1:
+                        wait_time = base_delay * (2 ** attempt) + random.uniform(1, 3)
+                        st.warning(f"⏳ {ticker} 상세정보 API 제한 감지, {wait_time:.1f}초 후 재시도 ({attempt + 1}/{max_retries})")
+                        time.sleep(wait_time)
+                        continue
+                    else:
+                        st.error(f"❌ {ticker} 상세정보 조회 실패: API 요청 제한 초과")
+                        return None
+                else:
+                    st.error(f"오류: {ticker} 정보 조회 중 문제가 발생했습니다: {e}")
+                    return None
+
+        return None
 
     def get_portfolio_summary(self):
         """포트폴리오 전체 요약 데이터 반환 (USD 및 KRW)"""
         total_investment = 0
         total_current_value = 0
 
-        for ticker in self.holdings:
+        for i, ticker in enumerate(self.holdings):
+            # API 호출 간 딜레이 추가 (첫 번째 종목 제외)
+            if i > 0:
+                time.sleep(1)
+
             current_price = self.get_current_price(ticker)
 
             if current_price:
@@ -114,15 +174,44 @@ class USPortfolio:
             'exchange_rate': self.exchange_rate
         }
 
-    def get_historical_data(self, ticker, period="1mo"):
-        """주식의 과거 데이터를 조회하는 함수"""
-        try:
-            stock = yf.Ticker(ticker)
-            hist = stock.history(period=period)
-            return hist
-        except Exception as e:
-            st.error(f"과거 데이터 조회 중 오류 발생: {e}")
-            return None
+    @st.cache_data(ttl=600)  # 10분 캐시 (과거 데이터는 자주 변하지 않음)
+    def get_historical_data(_self, ticker, period="1mo"):
+        """주식의 과거 데이터를 조회하는 함수 (재시도 로직 포함)"""
+        max_retries = 3
+        base_delay = 2
+
+        for attempt in range(max_retries):
+            try:
+                # API 호출 간 랜덤 딜레이 추가
+                if attempt > 0:
+                    delay = base_delay * (2 ** attempt) + random.uniform(0, 1)
+                    time.sleep(delay)
+
+                # 작은 딜레이 추가 (연속 호출 방지)
+                time.sleep(0.5)
+
+                stock = yf.Ticker(ticker)
+                hist = stock.history(period=period)
+                return hist
+
+            except Exception as e:
+                error_msg = str(e)
+
+                # Rate limit 에러인 경우
+                if "Too Many Requests" in error_msg or "Rate limited" in error_msg:
+                    if attempt < max_retries - 1:
+                        wait_time = base_delay * (2 ** attempt) + random.uniform(1, 3)
+                        st.warning(f"⏳ {ticker} 차트 데이터 API 제한 감지, {wait_time:.1f}초 후 재시도 ({attempt + 1}/{max_retries})")
+                        time.sleep(wait_time)
+                        continue
+                    else:
+                        st.error(f"❌ {ticker} 차트 데이터 조회 실패: API 요청 제한 초과")
+                        return None
+                else:
+                    st.error(f"과거 데이터 조회 중 오류 발생: {e}")
+                    return None
+
+        return None
 
     def display_dashboard(self):
         """Streamlit 대시보드 표시"""
@@ -179,7 +268,11 @@ class USPortfolio:
 
         portfolio_data = []
 
-        for ticker in self.holdings:
+        for i, ticker in enumerate(self.holdings):
+            # API 호출 간 딜레이 추가 (첫 번째 종목 제외)
+            if i > 0:
+                time.sleep(1)
+
             current_price = self.get_current_price(ticker)
 
             if current_price:
@@ -213,8 +306,12 @@ class USPortfolio:
         # 개별 종목 차트
         st.subheader("종목별 30일 가격 추이")
 
-        for ticker in self.holdings:
+        for i, ticker in enumerate(self.holdings):
             with st.expander(f"📈 {self.stock_names[ticker]} ({ticker})"):
+                # API 호출 간 딜레이 추가 (첫 번째 종목 제외)
+                if i > 0:
+                    time.sleep(1)
+
                 hist_data = self.get_historical_data(ticker, period="1mo")
 
                 if hist_data is not None and not hist_data.empty:
