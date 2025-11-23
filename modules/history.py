@@ -3,12 +3,16 @@ import streamlit as st
 
 class TransactionHistory:
     def __init__(self):
-        # Google Sheet Public Export URL
-        # Sheet ID: 1Hppkoz7zbZlSCEwPR0vzCRV94eP6c7j9udaE0qKXtws
-        # GID for '2.거래내역' might be needed if it's not the first sheet, but usually export?format=xlsx downloads all.
-        # However, pandas read_excel can read specific sheets.
-        self.sheet_url = "https://docs.google.com/spreadsheets/d/1Hppkoz7zbZlSCEwPR0vzCRV94eP6c7j9udaE0qKXtws/export?format=xlsx"
-        self.sheet_name = "2.거래내역"
+        # Google Sheet URL and sheet name are now stored in Streamlit secrets
+        # for security purposes. See .streamlit/secrets.toml for configuration.
+        try:
+            self.sheet_url = st.secrets["google_sheets"]["url"]
+            self.sheet_name = st.secrets["google_sheets"]["sheet_name"]
+        except (KeyError, FileNotFoundError):
+            st.error("Google Sheets configuration not found in secrets. Please check .streamlit/secrets.toml")
+            # Fallback to empty values
+            self.sheet_url = ""
+            self.sheet_name = ""
 
     def get_history(self):
         """구글 스프레드시트에서 거래내역을 가져옵니다."""

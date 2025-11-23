@@ -101,8 +101,34 @@ stock-dashboard/
 ### 1. 포트폴리오 종목 설정
 `modules/` 폴더 내의 각 파이썬 파일(`korean_stocks.py`, `us_stocks.py`)에서 `holdings`(보유수량) 및 `avg_price`(평단가) 딕셔너리를 수정하여 자신의 포트폴리오를 반영할 수 있습니다.
 
-### 2. 구글 시트 연동 (연금저축)
-연금저축 기능을 사용하려면 Google Cloud Console에서 서비스 계정을 생성하고, JSON 키 파일을 프로젝트 루트에 위치시켜야 합니다. 또한, `modules/pension.py` 내의 시트 URL을 본인의 시트 주소로 변경해야 합니다.
+### 2. 구글 시트 연동 (연금저축) - 필수 설정
+
+#### 보안 설정: Streamlit Secrets 구성
+
+보안을 위해 Google Sheets URL과 같은 민감한 정보는 `.streamlit/secrets.toml` 파일에 저장해야 합니다.
+
+**단계별 설정:**
+
+1. `.streamlit/secrets.toml` 파일을 열어 아래와 같이 설정합니다:
+
+```toml
+[google_sheets]
+# Google Sheets export URL (본인의 시트 URL로 변경하세요)
+url = "https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/export?format=xlsx"
+
+# 거래내역이 있는 시트 이름
+sheet_name = "2.거래내역"
+```
+
+2. **중요**: Google Sheets URL 찾는 방법
+   - Google Sheets를 열고 주소창에서 스프레드시트 ID를 복사합니다
+   - 예: `https://docs.google.com/spreadsheets/d/1Hppkoz7zbZlSCEwPR0vzCRV94eP6c7j9udaE0qKXtws/edit`
+   - URL 형식: `https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/export?format=xlsx`
+
+3. **보안 체크리스트**:
+   - ✅ `.gitignore`에 `secrets.toml`이 포함되어 있는지 확인 (이미 포함됨)
+   - ✅ 절대로 `secrets.toml` 파일을 Git에 커밋하지 마세요
+   - ✅ Google Sheets 공유 설정을 "링크가 있는 사용자"에서 "특정 사용자"로 변경 권장
 
 ## 📊 사용 기술
 
