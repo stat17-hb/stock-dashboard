@@ -1,5 +1,6 @@
 import pandas as pd
 import streamlit as st
+from urllib.parse import urlparse
 
 class TransactionHistory:
     def __init__(self):
@@ -8,11 +9,29 @@ class TransactionHistory:
         try:
             self.sheet_url = st.secrets["google_sheets"]["url"]
             self.sheet_name = st.secrets["google_sheets"]["sheet_name"]
-        except (KeyError, FileNotFoundError):
-            st.error("Google Sheets configuration not found in secrets. Please check .streamlit/secrets.toml")
+            self._validate_sheet_url()
+        except (KeyError, FileNotFoundError, ValueError) as exc:
+            st.error(
+                "Invalid Google Sheets configuration in secrets: "
+                f"{exc}. Please check .streamlit/secrets.toml"
+            )
             # Fallback to empty values
             self.sheet_url = ""
             self.sheet_name = ""
+
+    def _validate_sheet_url(self):
+        """Ensure the configured sheet URL uses HTTPS and points to Google Sheets."""
+        if not self.sheet_url:
+            raise ValueError("Google Sheets URL is empty.")
+
+        parsed = urlparse(self.sheet_url)
+        if parsed.scheme != "https":
+            raise ValueError("Google Sheets URL must use HTTPS.")
+
+        # Restrict to known Google Sheets hosts to avoid SSRF or local file access
+        allowed_hosts = {"docs.google.com", "drive.google.com"}
+        if parsed.netloc not in allowed_hosts:
+            raise ValueError("Google Sheets URL must point to Google Sheets domain.")
 
     def get_history(self):
         """구글 스프레드시트에서 거래내역을 가져옵니다."""
