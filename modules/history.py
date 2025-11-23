@@ -8,8 +8,14 @@ class TransactionHistory:
         try:
             self.sheet_url = st.secrets["google_sheets"]["url"]
             self.sheet_name = st.secrets["google_sheets"]["sheet_name"]
-        except (KeyError, FileNotFoundError):
-            st.error("Google Sheets configuration not found in secrets. Please check .streamlit/secrets.toml")
+        except KeyError as e:
+            st.error(f"Google Sheets configuration not found in secrets: {e}")
+            st.info("Please restart the Streamlit app to load the secrets configuration.")
+            # Fallback to empty values
+            self.sheet_url = ""
+            self.sheet_name = ""
+        except Exception as e:
+            st.error(f"Error loading secrets: {type(e).__name__}: {e}")
             # Fallback to empty values
             self.sheet_url = ""
             self.sheet_name = ""
