@@ -1,25 +1,189 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-from modules.korean_stocks import KoreanPortfolio
-from modules.us_stocks import USPortfolio
+from modules.pension import PensionRebalancing
+from modules.history import TransactionHistory
 
 # 페이지 설정
 st.set_page_config(
-    page_title="보유종목 대시보드",
-    page_icon="📊",
+    page_title="STOCK DASHBOARD",
+    page_icon="📈",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
+# CSS 스타일 주입
+st.markdown("""
+    <style>
+        /* Global Settings */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        
+        /* Apply Sans-Serif font to most text, but exclude icons */
+        html, body, [class*="css"] {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-size: 16px;
+            line-height: 1.6;
+            color: #D1D4DC;
+        }
+        
+        /* Main Background */
+        .stApp {
+            background-color: #131722;
+            color: #D1D4DC;
+        }
+        
+        /* Sidebar */
+        [data-testid="stSidebar"] {
+            background-color: #1E222D;
+            border-right: 1px solid #2A2E39;
+        }
+        
+        /* Headers */
+        h1, h2, h3, h4, h5, h6 {
+            color: #D1D4DC !important;
+            background-color: transparent;
+            padding: 0;
+            border: none;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+        
+        /* Text Colors */
+        p, div, span, label {
+            color: #D1D4DC;
+        }
+        
+        /* Metrics */
+        [data-testid="stMetricValue"] {
+            color: #D1D4DC !important;
+            font-size: 28px !important;
+            font-weight: 700;
+        }
+        [data-testid="stMetricLabel"] {
+            color: #787B86 !important;
+            font-size: 14px !important;
+            font-weight: 400;
+        }
+        
+        /* Dataframes */
+        [data-testid="stDataFrame"] {
+            background-color: #131722;
+        }
+        [data-testid="stDataFrame"] th {
+            background-color: #1E222D !important;
+            color: #D1D4DC !important;
+            border-bottom: 1px solid #2A2E39 !important;
+        }
+        [data-testid="stDataFrame"] td {
+            background-color: #131722 !important;
+            color: #D1D4DC !important;
+            border-bottom: 1px solid #2A2E39 !important;
+        }
+        
+        /* Tabs */
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 20px;
+            background-color: transparent;
+            border-bottom: 1px solid #2A2E39;
+            padding-bottom: 0;
+        }
+        .stTabs [data-baseweb="tab"] {
+            height: 40px;
+            white-space: pre-wrap;
+            background-color: transparent;
+            border: none;
+            color: #787B86;
+            font-weight: 600;
+            padding: 0 10px;
+        }
+        .stTabs [aria-selected="true"] {
+            background-color: transparent !important;
+            color: #2962FF !important;
+            border-bottom: 2px solid #2962FF;
+        }
+        .stTabs [aria-selected="true"] p {
+            color: #2962FF !important;
+        }
+        
+        /* Buttons */
+        .stButton > button {
+            background-color: #2962FF;
+            color: #FFFFFF;
+            border: none;
+            border-radius: 4px;
+            padding: 8px 16px;
+            font-weight: 600;
+            transition: background-color 0.2s;
+        }
+        .stButton > button:hover {
+            background-color: #1E53E5;
+            color: #FFFFFF;
+            border: none;
+        }
+        
+        /* Inputs */
+        .stTextInput > div > div > input, .stNumberInput > div > div > input, .stSelectbox > div > div > div {
+            background-color: #1E222D;
+            color: #D1D4DC;
+            border: 1px solid #2A2E39;
+            border-radius: 4px;
+        }
+        
+        /* Expander */
+        .streamlit-expanderHeader {
+            background-color: #1E222D !important;
+            color: #D1D4DC !important;
+            border: 1px solid #2A2E39;
+            border-radius: 4px;
+        }
+        
+        /* Divider */
+        hr {
+            border-color: #2A2E39;
+            margin: 20px 0;
+        }
+        
+        /* Ticker Row Styling */
+        .ticker-row {
+            display: flex; 
+            justify-content: space-between; 
+            background-color: #1E222D; 
+            padding: 12px 20px; 
+            border-bottom: 1px solid #2A2E39; 
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        .ticker-item {
+            color: #D1D4DC; 
+            font-weight: 600; 
+            font-size: 14px;
+        }
+        .ticker-up { color: #26a69a; }
+        .ticker-down { color: #ef5350; }
+        
+    </style>
+""", unsafe_allow_html=True)
+
+# Ticker Row (Mock Data for Speed, or use simple fdr calls if preferred)
+# Using static placeholders for now to ensure layout, can be connected to real data later
+st.markdown("""
+    <div class="ticker-row">
+        <span class="ticker-item">S&P 500 <span class="ticker-up">▲ 5,088.80 (+1.03%)</span></span>
+        <span class="ticker-item">NASDAQ <span class="ticker-up">▲ 16,041.62 (+1.30%)</span></span>
+        <span class="ticker-item">KOSPI <span class="ticker-down">▼ 2,647.00 (-0.50%)</span></span>
+        <span class="ticker-item">USD/KRW <span class="ticker-up">▲ 1,330.00 (+0.15%)</span></span>
+        <span class="ticker-item">GOLD <span class="ticker-up">▲ 2,035.00 (+0.50%)</span></span>
+    </div>
+""", unsafe_allow_html=True)
+
 # 타이틀
-st.title("📊 보유종목 대시보드")
-st.markdown(f"**조회 시간**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+st.title("STOCK DASHBOARD")
+st.markdown(f"**SYSTEM TIME**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 # 사이드바
 with st.sidebar:
-    st.header("설정")
-    auto_refresh = st.checkbox("자동 새로고침 (60초)", value=False)
+    st.header("SETTINGS")
+    auto_refresh = st.checkbox("AUTO REFRESH (60s)", value=False)
 
     if auto_refresh:
         import time
@@ -27,130 +191,67 @@ with st.sidebar:
         st.rerun()
 
     st.markdown("---")
-    st.info("국내주식과 해외주식 포트폴리오를 실시간으로 모니터링합니다.")
+    st.info("MONITORING ACTIVE")
 
 # 탭 생성
-tab1, tab2, tab3 = st.tabs(["국내 ETF", "해외 주식", "전체 요약"])
+tab1, tab2, tab3 = st.tabs(["BY ACCOUNT", "ALL TRANSACTIONS", "PENSION REBALANCING"])
 
-# 국내 ETF 탭
+# 데이터 로드 (한 번만 로드하여 공유)
+try:
+    history = TransactionHistory()
+    df_history = history.get_history()
+except Exception as e:
+    st.error(f"DATA FETCH ERROR: {e}")
+    df_history = pd.DataFrame()
+
+# 1. 계좌별 보기 탭
 with tab1:
-    st.header("🇰🇷 국내 ETF 포트폴리오")
+    st.header("Transaction History by Account")
+    
+    if not df_history.empty:
+        accounts, account_col = history.get_accounts(df_history)
+        
+        if accounts:
+            selected_account = st.selectbox("SELECT ACCOUNT", accounts)
+            
+            if selected_account:
+                filtered_df = df_history[df_history[account_col] == selected_account]
+                styled_df = history.style_dataframe(filtered_df)
+                st.dataframe(styled_df, use_container_width=True, hide_index=True)
+                st.caption(f"Records: {len(filtered_df)}")
+        else:
+            st.warning("ACCOUNT COLUMN NOT FOUND IN DATA")
+            # 계좌 컬럼을 못 찾으면 전체 데이터 표시
+            styled_df = history.style_dataframe(df_history)
+            st.dataframe(styled_df, use_container_width=True, hide_index=True)
+    else:
+        st.warning("NO DATA AVAILABLE")
 
-    try:
-        korean_portfolio = KoreanPortfolio()
-        korean_portfolio.display_dashboard()
-    except Exception as e:
-        st.error(f"국내 ETF 데이터 조회 중 오류가 발생했습니다: {e}")
-
-# 해외 주식 탭
+# 2. 전체 보기 탭
 with tab2:
-    st.header("🇺🇸 해외 주식 포트폴리오")
+    st.header("All Transactions")
+    
+    if not df_history.empty:
+        styled_df = history.style_dataframe(df_history)
+        st.dataframe(styled_df, use_container_width=True, hide_index=True)
+        st.caption(f"Total Records: {len(df_history)}")
+    else:
+        st.warning("NO DATA AVAILABLE")
 
-    try:
-        us_portfolio = USPortfolio()
-        us_portfolio.display_dashboard()
-    except Exception as e:
-        st.error(f"해외 주식 데이터 조회 중 오류가 발생했습니다: {e}")
-
-# 전체 요약 탭
+# 3. 연금 리밸런싱 탭
 with tab3:
-    st.header("📈 전체 포트폴리오 요약")
-
     try:
-        # 국내 ETF 데이터
-        korean_portfolio = KoreanPortfolio()
-        korean_summary = korean_portfolio.get_portfolio_summary()
-
-        # 해외 주식 데이터
-        us_portfolio = USPortfolio()
-        us_summary = us_portfolio.get_portfolio_summary()
-
-        # 전체 요약 메트릭
-        col1, col2, col3 = st.columns(3)
-
-        with col1:
-            total_investment = korean_summary['total_investment'] + us_summary['total_investment_krw']
-            st.metric(
-                "총 투자금액",
-                f"{total_investment:,.0f}원"
-            )
-
-        with col2:
-            total_value = korean_summary['total_current_value'] + us_summary['total_current_value_krw']
-            st.metric(
-                "현재 총 자산",
-                f"{total_value:,.0f}원"
-            )
-
-        with col3:
-            total_profit = korean_summary['total_profit_loss'] + us_summary['total_profit_loss_krw']
-            total_return = (total_profit / total_investment * 100) if total_investment > 0 else 0
-            st.metric(
-                "총 수익률",
-                f"{total_return:+.2f}%",
-                f"{total_profit:+,.0f}원"
-            )
-
-        st.markdown("---")
-
-        # 포트폴리오 비율 차트
-        col1, col2 = st.columns(2)
-
-        with col1:
-            st.subheader("포트폴리오 구성 비율")
-            portfolio_data = pd.DataFrame({
-                '구분': ['국내 ETF', '해외 주식'],
-                '금액': [korean_summary['total_current_value'], us_summary['total_current_value_krw']]
-            })
-            st.bar_chart(portfolio_data.set_index('구분'))
-
-        with col2:
-            st.subheader("수익률 비교")
-            return_data = pd.DataFrame({
-                '구분': ['국내 ETF', '해외 주식'],
-                '수익률(%)': [korean_summary['total_return'], us_summary['total_return']]
-            })
-            st.bar_chart(return_data.set_index('구분'))
-
-        # 상세 데이터 테이블
-        st.markdown("---")
-        st.subheader("상세 비교")
-
-        comparison_df = pd.DataFrame({
-            '구분': ['국내 ETF', '해외 주식', '합계'],
-            '투자금액': [
-                f"{korean_summary['total_investment']:,.0f}원",
-                f"{us_summary['total_investment_krw']:,.0f}원",
-                f"{total_investment:,.0f}원"
-            ],
-            '현재가치': [
-                f"{korean_summary['total_current_value']:,.0f}원",
-                f"{us_summary['total_current_value_krw']:,.0f}원",
-                f"{total_value:,.0f}원"
-            ],
-            '수익률': [
-                f"{korean_summary['total_return']:+.2f}%",
-                f"{us_summary['total_return']:+.2f}%",
-                f"{total_return:+.2f}%"
-            ],
-            '손익': [
-                f"{korean_summary['total_profit_loss']:+,.0f}원",
-                f"{us_summary['total_profit_loss_krw']:+,.0f}원",
-                f"{total_profit:+,.0f}원"
-            ]
-        })
-
-        st.dataframe(comparison_df, use_container_width=True, hide_index=True)
-
+        pension = PensionRebalancing()
+        pension.display_dashboard()
     except Exception as e:
-        st.error(f"전체 요약 데이터 조회 중 오류가 발생했습니다: {e}")
+        st.error(f"DATA FETCH ERROR: {e}")
 
 # 푸터
 st.markdown("---")
 st.markdown(
     """
-    <div style='text-align: center; color: gray;'>
-        <small>보유종목 대시보드 | Powered by Streamlit</small>
+    <div style='text-align: center; color: #787B86; font-family: Inter, sans-serif;'>
+        <small>STOCK DASHBOARD | SYSTEM ONLINE</small>
     </div>
     """,
     unsafe_allow_html=True

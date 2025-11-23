@@ -200,7 +200,15 @@ class KoreanPortfolio:
                 })
 
         df = pd.DataFrame(portfolio_data)
-        st.dataframe(df, use_container_width=True, hide_index=True)
+        
+        # 스타일링 적용
+        styled_df = df.style.set_properties(**{
+            'background-color': '#000000',
+            'color': '#FF9800',
+            'border-color': '#333333'
+        }).map(lambda x: 'color: #00FF00' if '+' in str(x) else ('color: #FF0000' if '-' in str(x) else ''), subset=['수익률', '손익'])
+        
+        st.dataframe(styled_df, use_container_width=True, hide_index=True)
 
         st.markdown("---")
 
