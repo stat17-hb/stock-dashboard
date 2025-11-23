@@ -1,23 +1,39 @@
 import pandas as pd
 import streamlit as st
-from urllib.parse import urlparse
+import gspread
+from google.oauth2.service_account import Credentials
 
 class TransactionHistory:
     def __init__(self):
-        # Google Sheet URL and sheet name are now stored in Streamlit secrets
-        # for security purposes. See .streamlit/secrets.toml for configuration.
+        # Google Sheets API를 사용한 안전한 인증 방식
+        # 서비스 계정 키는 .streamlit/secrets.toml에 저장됩니다
         try:
-            self.sheet_url = st.secrets["google_sheets"]["url"]
+            # Streamlit secrets에서 서비스 계정 정보 가져오기
+            credentials_dict = dict(st.secrets["gcp_service_account"])
             self.sheet_name = st.secrets["google_sheets"]["sheet_name"]
-            self._validate_sheet_url()
-        except (KeyError, FileNotFoundError, ValueError) as exc:
-            st.error(
-                "Invalid Google Sheets configuration in secrets: "
-                f"{exc}. Please check .streamlit/secrets.toml"
-            )
-            # Fallback to empty values
-            self.sheet_url = ""
+            self.spreadsheet_id = st.secrets["google_sheets"]["spreadsheet_id"]
+
+            # Google Sheets API 인증
+            scopes = [
+                "https://www.googleapis.com/auth/spreadsheets.readonly",
+                "https://www.googleapis.com/auth/drive.readonly"
+            ]
+            credentials = Credentials.from_service_account_info(credentials_dict, scopes=scopes)
+            self.gc = gspread.authorize(credentials)
+
+        except KeyError as e:
+            st.error(f"Google Sheets configuration not found in secrets: {e}")
+            st.info("Please restart the Streamlit app to load the secrets configuration.")
+            # Fallback to None
+            self.gc = None
             self.sheet_name = ""
+            self.spreadsheet_id = ""
+        except Exception as e:
+            st.error(f"Error loading secrets: {type(e).__name__}: {e}")
+            # Fallback to None
+            self.gc = None
+            self.sheet_name = ""
+            self.spreadsheet_id = ""
 
     def _validate_sheet_url(self):
         """Ensure the configured sheet URL uses HTTPS and points to Google Sheets."""
@@ -34,16 +50,26 @@ class TransactionHistory:
             raise ValueError("Google Sheets URL must point to Google Sheets domain.")
 
     def get_history(self):
-        """구글 스프레드시트에서 거래내역을 가져옵니다."""
+        """구글 스프레드시트에서 거래내역을 가져옵니다 (Google Sheets API 사용)."""
         try:
-            # pandas는 URL에서 직접 엑셀 파일을 읽을 수 있습니다.
-            df = pd.read_excel(self.sheet_url, sheet_name=self.sheet_name)
-            
+            if not self.gc:
+                st.warning("Google Sheets API 인증이 설정되지 않았습니다.")
+                return pd.DataFrame()
+
+            # 스프레드시트 열기
+            spreadsheet = self.gc.open_by_key(self.spreadsheet_id)
+
+            # 특정 시트 선택
+            worksheet = spreadsheet.worksheet(self.sheet_name)
+
+            # 데이터를 DataFrame으로 변환
+            data = worksheet.get_all_records()
+            df = pd.DataFrame(data)
+
             # 데이터 전처리 (필요한 경우)
-            # 예: 날짜 형식 변환, NaN 처리 등
             if '날짜' in df.columns:
-                df['날짜'] = pd.to_datetime(df['날짜']).dt.strftime('%Y-%m-%d')
-                
+                df['날짜'] = pd.to_datetime(df['날짜'], errors='coerce').dt.strftime('%Y-%m-%d')
+
             return df
         except Exception as e:
             st.error(f"거래내역을 불러오는 중 오류가 발생했습니다: {e}")

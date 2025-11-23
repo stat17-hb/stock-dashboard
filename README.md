@@ -103,32 +103,90 @@ stock-dashboard/
 
 ### 2. 구글 시트 연동 (연금저축) - 필수 설정
 
-#### 보안 설정: Streamlit Secrets 구성
+#### 🔐 보안 설정: Google Sheets API + 서비스 계정
 
-보안을 위해 Google Sheets URL과 같은 민감한 정보는 `.streamlit/secrets.toml` 파일에 저장해야 합니다.
+**이 방법의 장점:**
+- ✅ Google Sheets를 "제한됨" (특정 사용자만)으로 설정 가능
+- ✅ 공개 URL 노출 없이 안전하게 데이터 접근
+- ✅ 세밀한 권한 제어 (읽기 전용 등)
 
-**단계별 설정:**
+#### 📋 단계별 설정 가이드
 
-1. `.streamlit/secrets.toml` 파일을 열어 아래와 같이 설정합니다:
+**Step 1: Google Cloud 프로젝트 및 서비스 계정 생성**
+
+1. [Google Cloud Console](https://console.cloud.google.com/)에 접속
+2. 새 프로젝트 생성 또는 기존 프로젝트 선택
+3. **API 및 서비스 > 라이브러리**로 이동하여 다음 API 활성화:
+   - Google Sheets API
+   - Google Drive API
+
+4. **IAM 및 관리자 > 서비스 계정**으로 이동
+5. "서비스 계정 만들기" 클릭:
+   - 서비스 계정 이름: `stock-dashboard-reader` (원하는 이름)
+   - 역할: "기본" (권한 불필요)
+   - "완료" 클릭
+
+6. 생성된 서비스 계정 클릭 > **키** 탭으로 이동
+7. "키 추가" > "새 키 만들기" > **JSON** 선택 > "만들기"
+8. JSON 키 파일 다운로드 (안전한 곳에 보관!)
+
+**Step 2: Google Sheets 권한 설정**
+
+1. Google Sheets를 엽니다
+2. 주소창에서 **스프레드시트 ID**를 복사합니다
+   - 예: `https://docs.google.com/spreadsheets/d/1Hppkoz7zbZlSCEwPR0vzCRV94eP6c7j9udaE0qKXtws/edit`
+   - ID: `1Hppkoz7zbZlSCEwPR0vzCRV94eP6c7j9udaE0qKXtws`
+
+3. 우측 상단 "공유" 버튼 클릭
+4. 서비스 계정 이메일 추가:
+   - 형식: `stock-dashboard-reader@프로젝트ID.iam.gserviceaccount.com`
+   - 권한: **뷰어** (읽기 전용)
+5. **완료** 클릭
+
+**Step 3: Streamlit Secrets 설정**
+
+1. 프로젝트의 `.streamlit/secrets.toml` 파일 생성 (또는 `secrets.toml.example` 복사)
+
+2. 다운로드한 JSON 키 파일을 열어 내용을 `secrets.toml`에 다음과 같이 입력:
 
 ```toml
 [google_sheets]
-# Google Sheets export URL (본인의 시트 URL로 변경하세요)
-url = "https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/export?format=xlsx"
-
-# 거래내역이 있는 시트 이름
+spreadsheet_id = "YOUR_SPREADSHEET_ID"  # Step 2에서 복사한 ID
 sheet_name = "2.거래내역"
+
+[gcp_service_account]
+type = "service_account"
+project_id = "your-project-id"
+private_key_id = "your-private-key-id"
+private_key = "-----BEGIN PRIVATE KEY-----\nYOUR_PRIVATE_KEY\n-----END PRIVATE KEY-----\n"
+client_email = "your-service-account@your-project.iam.gserviceaccount.com"
+client_id = "123456789"
+auth_uri = "https://accounts.google.com/o/oauth2/auth"
+token_uri = "https://oauth2.googleapis.com/token"
+auth_provider_x509_cert_url = "https://www.googleapis.com/oauth2/v1/certs"
+client_x509_cert_url = "https://www.googleapis.com/robot/v1/metadata/x509/..."
+universe_domain = "googleapis.com"
 ```
 
-2. **중요**: Google Sheets URL 찾는 방법
-   - Google Sheets를 열고 주소창에서 스프레드시트 ID를 복사합니다
-   - 예: `https://docs.google.com/spreadsheets/d/1Hppkoz7zbZlSCEwPR0vzCRV94eP6c7j9udaE0qKXtws/edit`
-   - URL 형식: `https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/export?format=xlsx`
+3. **중요**: JSON 파일의 값을 그대로 복사하세요 (특히 `private_key`는 줄바꿈 `\n` 포함)
 
-3. **보안 체크리스트**:
-   - ✅ `.gitignore`에 `secrets.toml`이 포함되어 있는지 확인 (이미 포함됨)
-   - ✅ 절대로 `secrets.toml` 파일을 Git에 커밋하지 마세요
-   - ✅ Google Sheets 공유 설정을 "링크가 있는 사용자"에서 "특정 사용자"로 변경 권장
+**Step 4: 패키지 설치 및 실행**
+
+```bash
+# 새로운 패키지 설치
+pip install -r requirements.txt
+
+# Streamlit 앱 실행
+streamlit run app.py
+```
+
+#### 🔒 보안 체크리스트
+
+- ✅ `.gitignore`에 `secrets.toml`이 포함되어 있는지 확인 (이미 포함됨)
+- ✅ **절대로** `secrets.toml` 파일을 Git에 커밋하지 마세요
+- ✅ JSON 키 파일을 안전하게 보관하세요 (외부 공유 금지)
+- ✅ Google Sheets 공유 설정을 "제한됨"으로 변경 (서비스 계정만 접근)
+- ✅ 서비스 계정 권한을 "뷰어"(읽기 전용)로 제한
 
 ## 📊 사용 기술
 
