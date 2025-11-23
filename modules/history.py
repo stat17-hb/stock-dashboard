@@ -35,6 +35,20 @@ class TransactionHistory:
             self.sheet_name = ""
             self.spreadsheet_id = ""
 
+    def _validate_sheet_url(self):
+        """Ensure the configured sheet URL uses HTTPS and points to Google Sheets."""
+        if not self.sheet_url:
+            raise ValueError("Google Sheets URL is empty.")
+
+        parsed = urlparse(self.sheet_url)
+        if parsed.scheme != "https":
+            raise ValueError("Google Sheets URL must use HTTPS.")
+
+        # Restrict to known Google Sheets hosts to avoid SSRF or local file access
+        allowed_hosts = {"docs.google.com", "drive.google.com"}
+        if parsed.netloc not in allowed_hosts:
+            raise ValueError("Google Sheets URL must point to Google Sheets domain.")
+
     def get_history(self):
         """구글 스프레드시트에서 거래내역을 가져옵니다 (Google Sheets API 사용)."""
         try:
